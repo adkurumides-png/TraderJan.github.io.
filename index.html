@@ -773,7 +773,12 @@ function answerSRGame(scIdx, chosen){
   });
 }
 // ============ WIZUALNA GRA FORMACJE ŚWIECOWE ============
+let candleGameCorrect = 0;
+let candleGameTotal = 0;
+let currentCandleScenario = null;
+
 const candleScenarios = [
+  // ======= MŁOTEK – 4 scenariusze =======
   {
     name: "Młotek na wsparciu – trend wzrostowy",
     trend: "up",
@@ -893,7 +898,7 @@ const candleScenarios = [
     feedback: ["✅ Shooting Star + czerwona świeca = potwierdzenie SHORT. SL nad górnym cieniem.","❌ Potwierdzenie już jest – dalsze czekanie to strata okazji.","❌ Dwie niedźwiedzie świece na oporze to nie setup LONG."]
   },
 
-  // ======= OBJĘCIE (ENGULFING) – 4 scenariusze =======
+  // ======= OBJĘCIE – 4 scenariusze =======
   {
     name: "Bycze objęcie na wsparciu",
     trend: "up",
@@ -985,6 +990,87 @@ const candleScenarios = [
     feedback: ["❌ Doji po rajdzie to sygnał ostrzegawczy – nie zakładaj kontynuacji.","✅ Doji na szczycie = kupujący tracą momentum. Czekaj na potwierdzenie odwrócenia.","❌ Sam doji to za mało na SHORT. Potrzebujesz potwierdzenia następną świecą."]
   }
 ];
+
+function drawCandleGameCanvas(){
+  const c = document.getElementById('candleCanvas');
+  if(!c || !currentCandleScenario) return;
+  const ctx = c.getContext('2d');
+  const W = c.width, H = c.height;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle = '#070b12'; ctx.fillRect(0,0,W,H);
+  
+  const data = currentCandleScenario.candles;
+  const allP = data.flatMap(d=>[d.h,d.l]);
+  const minP = Math.min(...allP), maxP = Math.max(...allP);
+  const pad = (maxP-minP)*0.2;
+  const pMin = minP-pad, pMax = maxP+pad;
+  const toY = p => H-10-((p-pMin)/(pMax-pMin))*(H-40);
+  
+  const cw = (W-100)/data.length;
+  
+  ctx.strokeStyle = '#1a2434'; ctx.lineWidth = 0.5;
+  for(let i=0;i<=5;i++){
+    const y = 10 + (H-40)/5*i;
+    ctx.beginPath(); ctx.moveTo(40,y); ctx.lineTo(W-40,y); ctx.stroke();
+    ctx.fillStyle = '#4a5e72'; ctx.font = '9px monospace';
+    ctx.fillText((pMax-(pMax-pMin)/5*i).toFixed(0), W-38, y+3);
+  }
+  
+  data.forEach((d,i)=>{
+    const x = 50 + i*cw + cw*0.2;
+    const bw = Math.max(cw*0.55, 3);
+    const isBull = d.c >= d.o;
+    const yO = toY(d.o), yC = toY(d.c), yH = toY(d.h), yL = toY(d.l);
+    const isLast = i === data.length-1;
+    
+    ctx.strokeStyle = isBull ? '#2dba6a' : '#e05555';
+    ctx.lineWidth = isLast ? 2 : 1;
+    ctx.beginPath(); ctx.moveTo(x+bw/2, yH); ctx.lineTo(x+bw/2, Math.min(yO,yC)); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x+bw/2, Math.max(yO,yC)); ctx.lineTo(x+bw/2, yL); ctx.stroke();
+    
+    ctx.fillStyle = isBull ? (isLast ? '#2dba6a':'#1a4a2a') : (isLast ? '#e05555':'#3a1414');
+    ctx.strokeStyle = isBull ? '#2dba6a' : '#e05555';
+    ctx.fillRect(x, Math.min(yO,yC), bw, Math.max(Math.abs(yC-yO),1));
+    ctx.strokeRect(x, Math.min(yO,yC), bw, Math.max(Math.abs(yC-yO),1));
+    
+    if(isLast){
+      ctx.fillStyle = '#e2b03d';
+      ctx.font = 'bold 14px sans-serif';
+      ctx.fillText('👆', x+bw/2-10, yH-8);
+    }
+  });
+  
+  document.getElementById('candleHint').textContent = 
+    '👆 Ostatnia świeca wyróżniona. Trend: ' + (currentCandleScenario.trend==='up'?'📈 wzrostowy':'📉 spadkowy');
+}
+
+function newCandleGame(){
+  const idx = Math.floor(Math.random() * candleScenarios.length);
+  currentCandleScenario = candleScenarios[idx];
+  drawCandleGameCanvas();
+  
+  document.getElementById('candleGameOpts').innerHTML = currentCandleScenario.opts.map((o,i) => 
+    `<button class="quiz-opt" onclick="answerCandleGame(${i})">${o}</button>`
+  ).join('');
+  document.getElementById('candleGameFb').innerHTML = '';
+}
+
+function answerCandleGame(chosen){
+  if(!currentCandleScenario) return;
+  const sc = currentCandleScenario;
+  candleGameTotal++;
+  if(chosen === sc.correct) candleGameCorrect++;
+  
+  document.getElementById('candleGameScore').textContent = `Trafienia: ${candleGameCorrect}/${candleGameTotal}`;
+  document.getElementById('candleGameFb').innerHTML = 
+    `<div class="feedback ${chosen === sc.correct ? 'good' : 'bad'}">${sc.feedback[chosen]}</div>`;
+  
+  document.querySelectorAll('#candleGameOpts .quiz-opt').forEach((b,i) => {
+    b.disabled = true;
+    if(i === sc.correct) b.style.borderColor = 'var(--green)';
+    if(i === chosen && i !== sc.correct) b.style.borderColor = 'var(--red)';
+  });
+}
   
 // ============ INIT ============
 document.addEventListener('DOMContentLoaded',()=>{
