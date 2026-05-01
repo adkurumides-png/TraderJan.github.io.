@@ -135,11 +135,22 @@
 <div id="srFeedback" style="margin-top:0.5rem;"></div>
   </div>
   <div class="card"><h2>📐 Linie trendu</h2><p>Rysuj po minimum dwóch punktach styczności. Trzeci punkt to potencjalna reakcja. Nie naginaj linii na siłę.</p></div>
-  <div class="card"><h2>🎮 Ćwiczenie decyzyjne</h2><p>Trend 15M wzrostowy, cena dotyka wsparcia 62 000. Pojawia się bycza świeca. Co robisz?</p>
-    <button class="quiz-opt" onclick="feedbackM1(0)">📈 Wchodzę long od razu</button>
-    <button class="quiz-opt" onclick="feedbackM1(1)">⏳ Czekam na potwierdzenie następną świecą</button>
-    <button class="quiz-opt" onclick="feedbackM1(2)">📉 Gram short – odbije się</button>
-    <div id="fbM1"></div>
+  <div class="card">
+    <h2>🎯 S/R w praktyce – Twoja przewaga</h2>
+    <p>Znasz już teorię. Teraz sprawdź, czy potrafisz zastosować zasady wsparcia i oporu w prawdziwych sytuacjach.</p>
+    
+    <div class="info-box">📌 <strong>Zasady:</strong> 1. Wchodź tylko przy poziomie. 2. Kupuj przy wsparciu, sprzedawaj przy oporze. 3. 3 dotknięcia = silny poziom. 4. Flip to najlepszy setup. 5. SL tuż za poziomem.</div>
+    
+    <h3>🎮 Trening decyzji S/R</h3>
+    <p id="srGameQ">Kliknij <strong>Nowy scenariusz</strong>, aby rozpocząć.</p>
+    
+    <div id="srGameOpts"></div>
+    <div id="srGameFb"></div>
+    
+    <div style="margin-top:1rem; display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
+      <button class="btn btn-primary" onclick="newSRGame()">🔄 Nowy scenariusz</button>
+      <span id="srGameScore" style="font-size:0.85rem; color:var(--text-dim);"></span>
+    </div>
   </div>
   <div class="card"><h2>✅ Checklista M1</h2><div class="checklist" id="chk1"></div></div>
 </section>
@@ -648,7 +659,99 @@ function clearJournal(){ if(confirm('Usunąć cały dziennik?')){ localStorage.r
   localStorage.setItem('lastReminder',now);
   setTimeout(()=>{ if(confirm('⏰ Minął tydzień od ostatniej nauki. Chcesz powtórzyć ostatni moduł?')){ const lm=localStorage.getItem('lastModule'); if(lm) document.querySelector(`[data-module="${lm}"]`)?.click(); } },1500);
 })();
+// ============ GRA S/R – praktyczne decyzje ============
+let srGameCorrect = 0;
+let srGameTotal = 0;
 
+const srScenarios = [
+  {
+    q: "Cena zbliża się do silnego wsparcia (testowanego 3 razy). Trend 15M wzrostowy. Co robisz?",
+    opts: ["Wchodzę LONG przy wsparciu, po formacji potwierdzającej", "Wchodzę SHORT – cena pewnie przebije wsparcie", "Czekam na środku zakresu"],
+    correct: 0,
+    feedback: [
+      "✅ Dokładnie! Przy trendzie wzrostowym kupujesz przy wsparciu – to zgodne z kierunkiem rynku.",
+      "❌ Granie przeciw trendowi przy silnym wsparciu to duże ryzyko.",
+      "❌ Środek zakresu to strefa szumu – tam nie masz przewagi."
+    ]
+  },
+  {
+    q: "Opór został wybity, cena wraca i testuje go od góry. Pojawia się bycze objęcie. Co robisz?",
+    opts: ["Wchodzę LONG – to flip (opór → wsparcie)", "Wchodzę SHORT – cena odbije się od starego oporu", "Ignoruję – nie widać wyraźnego sygnału"],
+    correct: 0,
+    feedback: [
+      "✅ Świetnie! Flip to jeden z najsilniejszych setupów. Stary opór działa teraz jako wsparcie.",
+      "❌ Po wybiciu opór staje się wsparciem – shortowanie na wsparciu jest ryzykowne.",
+      "❌ Masz wyraźny sygnał: flip + objęcie. To silna konfluencja."
+    ]
+  },
+  {
+    q: "Widzisz poziom, który cena testowała tylko RAZ. Zbliża się do niego ponownie. Co robisz?",
+    opts: ["Czekam – poziom jest słaby, potrzebuję więcej potwierdzeń", "Wchodzę od razu – to przecież poziom S/R", "Ustawiam dużą pozycję – raz wystarczy"],
+    correct: 0,
+    feedback: [
+      "✅ Mądrze! Poziom testowany raz jest słaby. Minimum 2-3 dotknięcia dają pewność.",
+      "❌ Jeden test to za mało. Rynek może łatwo przełamać taki poziom.",
+      "❌ Duża pozycja na słabym poziomie to przepis na stratę."
+    ]
+  },
+  {
+    q: "Wchodzisz LONG przy wsparciu. Gdzie ustawisz stop loss?",
+    opts: ["Kilka ticków poniżej wsparcia", "Na środku zakresu", "Daleko od wsparcia – żeby nie wybiło"],
+    correct: 0,
+    feedback: [
+      "✅ Tak! SL tuż za poziomem. Jeśli wsparcie pęknie – uciekasz z małą stratą.",
+      "❌ SL na środku nie ma sensu – zostaniesz wybity przez szum.",
+      "❌ Szeroki SL zwiększa ryzyko. Przy x100 lepiej mieć ciasny stop i mniejszą pozycję."
+    ]
+  },
+  {
+    q: "Cena przebiła wsparcie i spada dalej. Twój SL został trafiony. Co robisz?",
+    opts: ["Akceptuję stratę i czekam na nowy setup", "Wchodzę jeszcze raz – cena na pewno wróci", "Przesuwam SL niżej i zostaję w pozycji"],
+    correct: 0,
+    feedback: [
+      "✅ Profesjonalnie! Poziom pękł = setup nieważny. Szukasz kolejnej okazji.",
+      "❌ To zemsta na rynku. Po stracie wchodzenie bez setupu powiększa straty.",
+      "❌ Przesuwanie SL w tył to najgorszy nawyk. Przy x100 szybko stracisz konto."
+    ]
+  },
+  {
+    q: "Ile silnych poziomów S/R powinieneś mieć na wykresie?",
+    opts: ["3-4, wyraźnie widoczne", "Jak najwięcej – im więcej, tym lepiej", "Jeden wystarczy"],
+    correct: 0,
+    feedback: [
+      "✅ 3-4 poziomy to optymalna liczba. Więcej to szum, mniej to za mało kontekstu.",
+      "❌ Zbyt wiele poziomów utrudnia decyzję. Mniej znaczy lepiej.",
+      "❌ Jeden poziom to za mało – nie widzisz pełnego obrazu rynku."
+    ]
+  }
+];
+
+function newSRGame(){
+  const idx = Math.floor(Math.random() * srScenarios.length);
+  const sc = srScenarios[idx];
+  document.getElementById('srGameQ').innerHTML = `<strong>Sytuacja:</strong> ${sc.q}`;
+  document.getElementById('srGameOpts').innerHTML = sc.opts.map((o,i) => 
+    `<button class="quiz-opt" onclick="answerSRGame(${idx},${i})">${o}</button>`
+  ).join('');
+  document.getElementById('srGameFb').innerHTML = '';
+  document.getElementById('srGameScore').textContent = `Wynik: ${srGameCorrect}/${srGameTotal}`;
+}
+
+function answerSRGame(scIdx, chosen){
+  const sc = srScenarios[scIdx];
+  srGameTotal++;
+  if(chosen === sc.correct) srGameCorrect++;
+  
+  document.getElementById('srGameScore').textContent = `Wynik: ${srGameCorrect}/${srGameTotal}`;
+  document.getElementById('srGameFb').innerHTML = 
+    `<div class="feedback ${chosen === sc.correct ? 'good' : 'bad'}">${sc.feedback[chosen]}</div>`;
+  
+  document.querySelectorAll('#srGameOpts .quiz-opt').forEach((b,i) => {
+    b.disabled = true;
+    if(i === sc.correct) b.style.borderColor = 'var(--green)';
+    if(i === chosen && i !== sc.correct) b.style.borderColor = 'var(--red)';
+  });
+}
 // ============ INIT ============
 document.addEventListener('DOMContentLoaded',()=>{
   renderChecklists();
