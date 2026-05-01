@@ -86,8 +86,10 @@
   <div class="card"><h2>📘 Czym jest giełda futures?</h2><p>Handlujesz <strong>kontraktami</strong> na cenę BTC, nie prawdziwym Bitcoinem. Możesz zarabiać na wzrostach (<strong>LONG</strong>) i spadkach (<strong>SHORT</strong>).</p></div>
   <div class="card"><h2>💣 Dźwignia x100 – broń obosieczna</h2><p>Kontrolujesz pozycję 100× większą niż depozyt. Ruch ceny o 0.5% w złą stronę = utrata całego depozytu (<strong>likwidacja</strong>).</p><div class="danger-box">🔴 ZAWSZE używaj stop lossa. Bez niego x100 to rosyjska ruletka.</div></div>
   <div class="card"><h2>🕯️ Świeca OHLC – podstawowa jednostka informacji</h2><p>Open (otwarcie), High (maksimum), Low (minimum), Close (zamknięcie).</p>
-    <div class="image-placeholder">🖼️ <strong>[OBRAZ: anatomia_swiecy.png]</strong><br>Pokaż zieloną i czerwoną świecę z podpisanymi O, H, L, C. Zielona: Close > Open. Czerwona: Close < Open.</div>
-  </div>
+    <div style="text-align:center; margin:1rem 0;">
+  <img src="image.jpg" alt="Anatomia świecy OHLC" style="max-width:100%; border-radius:10px; border:1px solid var(--border);">
+  <p style="color:var(--text-dim); font-size:0.8rem; margin-top:0.3rem;">🕯️ Zielona: Close > Open (bycza). Czerwona: Close < Open (niedźwiedzia).</p>
+</div>
   <div class="card"><h2>🧮 Kalkulator wielkości pozycji</h2><p>To Twoje najważniejsze narzędzie – używaj go przed KAŻDĄ transakcją.</p>
     <div class="calc-row"><div class="calc-field"><label>Kapitał (USDT)</label><input id="calc_cap" type="number" value="1000"></div><div class="calc-field"><label>Ryzyko % konta</label><input id="calc_risk" type="number" value="1" step="0.1"></div><div class="calc-field"><label>Odległość SL (%)</label><input id="calc_sl" type="number" value="0.25" step="0.01"></div></div>
     <div class="calc-row"><div class="calc-field"><label>Dźwignia</label><select id="calc_lev"><option>10</option><option>25</option><option>50</option><option selected>100</option></select></div><div class="calc-field"><label>Prowizja (%)</label><input id="calc_fee" type="number" value="0.05" step="0.01"></div><div class="calc-field"><label>Kierunek</label><select id="calc_dir"><option value="long">LONG</option><option value="short">SHORT</option></select></div></div>
