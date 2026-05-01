@@ -172,20 +172,23 @@
     </div>
   </div>
     <div class="card">
-    <h2>🎮 Trening formacji – rozpoznaj i zdecyduj</h2>
-    <p>Na podstawie opisu świecy i sytuacji rynkowej wybierz właściwą formację i zdecyduj, co robisz.</p>
+    <h2>🎮 Trening formacji – zobacz i zdecyduj</h2>
+    <p>Popatrz na wykres. Jaka formacja się pojawiła? Co robisz?</p>
     
-    <div class="info-box">📌 <strong>Zasada:</strong> Formacja musi współgrać z trendem i poziomem S/R. Sama świeca to za mało!</div>
+    <canvas id="candleCanvas" width="600" height="280" style="cursor:default;"></canvas>
     
-    <p id="candleGameQ">Kliknij <strong>Nowy scenariusz</strong>, aby rozpocząć.</p>
+    <div style="margin-top:0.5rem; display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
+      <span style="font-size:0.8rem; color:var(--gold);" id="candleHint">👆 Przyjrzyj się ostatnim świecom</span>
+    </div>
     
-    <div id="candleGameOpts"></div>
+    <div id="candleGameOpts" style="margin-top:0.8rem;"></div>
     <div id="candleGameFb"></div>
     
     <div style="margin-top:1rem; display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
       <button class="btn btn-primary" onclick="newCandleGame()">🔄 Nowy scenariusz</button>
       <span id="candleGameScore" style="font-size:0.85rem; color:var(--text-dim);"></span>
     </div>
+  </div>
   </div>
   <div class="card"><h2>✅ Checklista M2</h2><div class="checklist" id="chk2"></div></div>
 </section>
@@ -773,85 +776,166 @@ function answerSRGame(scIdx, chosen){
     if(i === chosen && i !== sc.correct) b.style.borderColor = 'var(--red)';
   });
 }
-// ============ GRA FORMACJE ŚWIECOWE ============
+// ============ WIZUALNA GRA FORMACJE ŚWIECOWE ============
 let candleGameCorrect = 0;
 let candleGameTotal = 0;
+let currentCandleScenario = null;
 
+// Scenariusze z danymi do narysowania
 const candleScenarios = [
   {
-    q: "Trend 15M wzrostowy. Cena dotyka wsparcia. Pojawia się świeca z DŁUGIM DOLNYM CIENIEM i małym zielonym korpusem u góry. Co widzisz?",
-    opts: ["🔨 Młotek – wchodzę LONG po potwierdzeniu", "⭐ Shooting Star – wchodzę SHORT", "🔄 Objęcie – czekam na następną świecę"],
+    name: "Młotek na wsparciu",
+    trend: "up",
+    candles: [
+      {o:100,h:103,l:98,c:99},{o:99,h:100,l:95,c:96},{o:96,h:98,l:90,c:97},{o:97,h:99,l:91,c:98},
+      {o:98,h:100,l:93,c:99},{o:99,h:101,l:88,c:99},{o:99,h:102,l:97,c:101},{o:101,h:103,l:98,c:102},
+      {o:102,h:104,l:99,c:103},{o:103,h:106,l:101,c:105},{o:105,h:107,l:102,c:106},{o:106,h:108,l:100,c:104},
+      {o:104,h:105,l:95,c:96},{o:96,h:97,l:85,c:96},{o:96,h:99,l:94,c:98}
+    ],
+    pattern: "hammer",
+    question: "Ostatnia świeca ma długi dolny cień i mały korpus u góry. Jest przy poziomie wsparcia. Co to?",
+    opts: ["🔨 Młotek – czekam na potwierdzenie LONG","⭐ Shooting Star – SHORT","➖ Doji – nie wchodzę"],
     correct: 0,
     feedback: [
-      "✅ Tak! Młotek na wsparciu = byczy sygnał. Ale zawsze czekaj na potwierdzenie następną świecą.",
-      "❌ Shooting Star ma długi GÓRNY cień, nie dolny. To nie ta formacja.",
-      "❌ Objęcie to pochłonięcie poprzedniej świecy – tu masz pojedynczą świecę z cieniem."
+      "✅ Tak! Młotek na wsparciu. Czekaj na zieloną świecę potwierdzającą, potem LONG.",
+      "❌ Shooting Star ma długi GÓRNY cień. Tu jest dolny – to młotek.",
+      "❌ To nie doji – korpus jest wyraźny, a cień długi tylko z jednej strony."
     ]
   },
   {
-    q: "Trend 15M spadkowy. Na oporze pojawia się świeca z DŁUGIM GÓRNYM CIENIEM i małym czerwonym korpusem u dołu. Co to?",
-    opts: ["🔨 Młotek – sygnał byczy", "⭐ Shooting Star – wchodzę SHORT po potwierdzeniu", "➖ Doji – rynek się waha, nie wchodzę"],
+    name: "Shooting Star na oporze",
+    trend: "down",
+    candles: [
+      {o:100,h:103,l:98,c:101},{o:101,h:104,l:99,c:102},{o:102,h:106,l:101,c:105},{o:105,h:108,l:104,c:106},
+      {o:106,h:109,l:105,c:107},{o:107,h:110,l:106,c:108},{o:108,h:111,l:107,c:109},{o:109,h:112,l:108,c:110},
+      {o:110,h:114,l:109,c:111},{o:111,h:113,l:108,c:109},{o:109,h:110,l:106,c:107},{o:107,h:108,l:104,c:105},
+      {o:105,h:106,l:101,c:102},{o:102,h:112,l:101,c:103},{o:103,h:104,l:100,c:104}
+    ],
+    pattern: "shooting_star",
+    question: "Ostatnia świeca ma długi górny cień i mały korpus u dołu. Jest przy oporze. Co to?",
+    opts: ["🔨 Młotek – LONG","⭐ Shooting Star – czekam na potwierdzenie SHORT","🔄 Objęcie – wchodzę LONG"],
     correct: 1,
     feedback: [
-      "❌ Młotek ma długi DOLNY cień. Ta świeca ma długi górny – to Shooting Star.",
-      "✅ Dokładnie! Shooting Star na oporze = niedźwiedzi sygnał. Czekaj na potwierdzenie.",
-      "❌ Doji ma równe Open i Close – tu jest wyraźny korpus i długi cień."
+      "❌ Młotek ma długi DOLNY cień. Tu jest górny – to Shooting Star.",
+      "✅ Shooting Star na oporze w trendzie spadkowym = sygnał SHORT po potwierdzeniu.",
+      "❌ Objęcie to dwie świece – tu masz pojedynczą z długim cieniem."
     ]
   },
   {
-    q: "Na wsparciu pojawia się DUŻA ZIELONA ŚWIECA, która całkowicie pochłania poprzednią czerwoną. High wyższy, Low niższy. Co to?",
-    opts: ["🔨 Młotek", "🔄 Bycze objęcie – wchodzę LONG", "⭐ Shooting Star"],
+    name: "Bycze objęcie na wsparciu",
+    trend: "up",
+    candles: [
+      {o:100,h:103,l:98,c:101},{o:101,h:104,l:99,c:102},{o:102,h:105,l:100,c:103},{o:103,h:106,l:101,c:104},
+      {o:104,h:107,l:102,c:105},{o:105,h:106,l:100,c:102},{o:102,h:103,l:97,c:98},{o:98,h:99,l:93,c:94},
+      {o:94,h:96,l:90,c:91},{o:91,h:93,l:88,c:89},{o:89,h:92,l:86,c:87},{o:87,h:89,l:84,c:85},
+      {o:85,h:87,l:82,c:83},{o:83,h:84,l:79,c:80},{o:80,h:88,l:78,c:88}
+    ],
+    pattern: "bullish_engulfing",
+    question: "Ostatnia zielona świeca całkowicie pochłania poprzednią czerwoną. Co to za formacja?",
+    opts: ["🔨 Młotek","🔄 Bycze objęcie – wchodzę LONG","⭐ Shooting Star"],
     correct: 1,
     feedback: [
-      "❌ Młotek to pojedyncza świeca z cieniem, nie dwie świece.",
-      "✅ Świetnie! Bycze objęcie na wsparciu to silny sygnał zmiany kierunku.",
-      "❌ Shooting Star ma długi górny cień – tu masz dwie świece, jedna pochłania drugą."
+      "❌ Młotek to pojedyncza świeca z cieniem – tu masz dwie świece.",
+      "✅ Bycze objęcie na wsparciu = silny sygnał LONG. SL pod dołkiem objęcia.",
+      "❌ Shooting Star ma długi górny cień – tu nie ma takiego cienia."
     ]
   },
   {
-    q: "Trend 15M wzrostowy. Na wsparciu pojawia się świeca z DŁUGIM DOLNYM CIENIEM. Następna świeca jest ZIELONA i zamyka się powyżej poprzedniej. Co robisz?",
-    opts: ["Wchodzę LONG – młotek potwierdzony", "Czekam jeszcze – to za mało", "Wchodzę SHORT – cena odbije się"],
-    correct: 0,
-    feedback: [
-      "✅ Młotek + potwierdzenie zieloną świecą = setup wejścia. SL pod dołkiem młotka.",
-      "❌ Masz już formację i potwierdzenie. Możesz wchodzić z małą pozycją.",
-      "❌ Shortowanie w trendzie wzrostowym przy wsparciu to walka z rynkiem."
-    ]
-  },
-  {
-    q: "Na oporze pojawia się świeca z DŁUGIM GÓRNYM I DŁUGIM DOLNYM CIENIEM, Open i Close są prawie równe. Co to?",
-    opts: ["🔨 Młotek", "⭐ Shooting Star", "➖ Doji – niezdecydowanie, lepiej poczekać"],
+    name: "Doji na oporze",
+    trend: "down",
+    candles: [
+      {o:100,h:103,l:99,c:101},{o:101,h:104,l:100,c:102},{o:102,h:105,l:101,c:103},{o:103,h:106,l:102,c:104},
+      {o:104,h:107,l:103,c:105},{o:105,h:108,l:104,c:106},{o:106,h:109,l:105,c:107},{o:107,h:110,l:106,c:108},
+      {o:108,h:111,l:107,c:109},{o:109,h:112,l:108,c:110},{o:110,h:113,l:109,c:111},{o:111,h:112,l:108,c:109},
+      {o:109,h:110,l:106,c:107},{o:107,h:109,l:105,c:106},{o:106,h:108,l:104,c:106}
+    ],
+    pattern: "doji",
+    question: "Ostatnia świeca ma bardzo mały korpus (Open ≈ Close) i cienie po obu stronach. Co to?",
+    opts: ["🔨 Młotek – LONG","⭐ Shooting Star – SHORT","➖ Doji – nie wchodzę, czekam"],
     correct: 2,
     feedback: [
-      "❌ Młotek ma długi dolny cień i mały korpus – tu cienie są po obu stronach.",
-      "❌ Shooting Star ma długi górny cień – tu są oba cienie długie.",
-      "✅ Doji = rynek się waha. Na oporze to ostrzeżenie – lepiej poczekać na wyraźniejszy sygnał."
-    ]
-  },
-  {
-    q: "Trend spadkowy. Na oporze pojawia się DUŻA CZERWONA ŚWIECA pochłaniająca poprzednią zieloną. Co robisz?",
-    opts: ["Wchodzę SHORT – niedźwiedzie objęcie na oporze", "Wchodzę LONG – cena się odbije", "Ignoruję – to słaby sygnał"],
-    correct: 0,
-    feedback: [
-      "✅ Niedźwiedzie objęcie na oporze w trendzie spadkowym = silny setup short.",
-      "❌ Long w trendzie spadkowym przy oporze? Nigdy nie walcz z trendem.",
-      "❌ Objęcie na poziomie to jeden z silniejszych sygnałów – nie ignoruj go."
+      "❌ Młotek ma długi dolny cień – tu cienie są równe z obu stron.",
+      "❌ Shooting Star ma długi górny cień – to nie ten przypadek.",
+      "✅ Doji = niezdecydowanie. Na oporze to ostrzeżenie – lepiej poczekać na wyraźniejszy sygnał."
     ]
   }
 ];
 
+function drawCandleGameCanvas(){
+  const c = document.getElementById('candleCanvas');
+  if(!c || !currentCandleScenario) return;
+  const ctx = c.getContext('2d');
+  const W = c.width, H = c.height;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle = '#070b12'; ctx.fillRect(0,0,W,H);
+  
+  const data = currentCandleScenario.candles;
+  const allP = data.flatMap(d=>[d.h,d.l]);
+  const minP = Math.min(...allP), maxP = Math.max(...allP);
+  const pad = (maxP-minP)*0.2;
+  const pMin = minP-pad, pMax = maxP+pad;
+  const toY = p => H-10-((p-pMin)/(pMax-pMin))*(H-40);
+  
+  const cw = (W-100)/data.length;
+  
+  // Siatka
+  ctx.strokeStyle = '#1a2434'; ctx.lineWidth = 0.5;
+  for(let i=0;i<=5;i++){
+    const y = 10 + (H-40)/5*i;
+    ctx.beginPath(); ctx.moveTo(40,y); ctx.lineTo(W-40,y); ctx.stroke();
+    ctx.fillStyle = '#4a5e72'; ctx.font = '9px monospace';
+    ctx.fillText((pMax-(pMax-pMin)/5*i).toFixed(0), W-38, y+3);
+  }
+  
+  // Świece
+  data.forEach((d,i)=>{
+    const x = 50 + i*cw + cw*0.2;
+    const bw = Math.max(cw*0.55, 3);
+    const isBull = d.c >= d.o;
+    const yO = toY(d.o), yC = toY(d.c), yH = toY(d.h), yL = toY(d.l);
+    
+    // Kolor ostatniej świecy wyróżniony
+    const isLast = i === data.length-1;
+    
+    ctx.strokeStyle = isBull ? '#2dba6a' : '#e05555';
+    ctx.lineWidth = isLast ? 2 : 1;
+    
+    // Cień
+    ctx.beginPath(); ctx.moveTo(x+bw/2, yH); ctx.lineTo(x+bw/2, Math.min(yO,yC)); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x+bw/2, Math.max(yO,yC)); ctx.lineTo(x+bw/2, yL); ctx.stroke();
+    
+    // Korpus
+    ctx.fillStyle = isBull ? (isLast ? '#2dba6a':'#1a4a2a') : (isLast ? '#e05555':'#3a1414');
+    ctx.strokeStyle = isBull ? '#2dba6a' : '#e05555';
+    ctx.fillRect(x, Math.min(yO,yC), bw, Math.max(Math.abs(yC-yO),1));
+    ctx.strokeRect(x, Math.min(yO,yC), bw, Math.max(Math.abs(yC-yO),1));
+    
+    // Strzałka przy ostatniej
+    if(isLast){
+      ctx.fillStyle = '#e2b03d';
+      ctx.font = 'bold 14px sans-serif';
+      ctx.fillText('👆', x+bw/2-10, yH-8);
+    }
+  });
+  
+  document.getElementById('candleHint').textContent = 
+    '👆 Ostatnia świeca wyróżniona. Trend: ' + (currentCandleScenario.trend==='up'?'📈 wzrostowy':'📉 spadkowy');
+}
+
 function newCandleGame(){
   const idx = Math.floor(Math.random() * candleScenarios.length);
-  const sc = candleScenarios[idx];
-  document.getElementById('candleGameQ').innerHTML = `<strong>Sytuacja:</strong> ${sc.q}`;
-  document.getElementById('candleGameOpts').innerHTML = sc.opts.map((o,i) => 
-    `<button class="quiz-opt" onclick="answerCandleGame(${idx},${i})">${o}</button>`
+  currentCandleScenario = candleScenarios[idx];
+  drawCandleGameCanvas();
+  
+  document.getElementById('candleGameOpts').innerHTML = currentCandleScenario.opts.map((o,i) => 
+    `<button class="quiz-opt" onclick="answerCandleGame(${i})">${o}</button>`
   ).join('');
   document.getElementById('candleGameFb').innerHTML = '';
 }
 
-function answerCandleGame(scIdx, chosen){
-  const sc = candleScenarios[scIdx];
+function answerCandleGame(chosen){
+  if(!currentCandleScenario) return;
+  const sc = currentCandleScenario;
   candleGameTotal++;
   if(chosen === sc.correct) candleGameCorrect++;
   
