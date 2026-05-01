@@ -51,6 +51,10 @@
     .j-entry .win{color:var(--green)}.j-entry .loss{color:var(--red)}
     canvas{border:1px solid var(--border);border-radius:8px;background:#070b12;cursor:crosshair;max-width:100%;margin:0.5rem 0}
     @media(max-width:768px){body{flex-direction:column}.sidebar{width:100%;height:auto;position:relative}.grid-2{grid-template-columns:1fr}}
+    #srScore{font-family:'Segoe UI',sans-serif}
+    #srFeedback .hit{color:var(--green)}
+    #srFeedback .miss{color:var(--gold)}
+    #srFeedback .info{color:var(--blue)}
   </style>
 </head>
 <body>
@@ -118,9 +122,17 @@
     <p style="color:var(--text-dim); font-size:0.8rem; margin-top:0.3rem;">📏 Poziome linie S/R na wykresie 5M. Zwróć uwagę na flip – opór staje się wsparciem po wybiciu.</p>
   </div>
 </div>
-    <h3>🎮 Ćwiczenie: rysowanie S/R</h3><p>Na poniższym wykresie przeciągnij myszką, by narysować poziome linie wsparcia i oporu. Kliknij „Pokaż przykładowe", żeby zobaczyć propozycję.</p>
-    <canvas id="canvasSR" width="650" height="280"></canvas>
-    <div style="margin-top:0.4rem"><button class="btn" onclick="clearCanvas()">🗑 Wyczyść</button><button class="btn" onclick="suggestSR()">💡 Pokaż przykładowe</button></div>
+<h3>🎮 Ćwiczenie: rysowanie S/R</h3>
+<p>Kliknij i przeciągnij myszką, by narysować poziomą linię wsparcia lub oporu. Po narysowaniu linii kliknij <strong>Sprawdź</strong>, aby zobaczyć, czy trafiłeś w pobliże prawidłowego poziomu.</p>
+<canvas id="canvasSR" width="700" height="320"></canvas>
+<div style="margin-top:0.5rem; display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
+  <button class="btn" onclick="clearCanvas()">🗑 Wyczyść linie</button>
+  <button class="btn" onclick="suggestSR()">💡 Pokaż poziomy</button>
+  <button class="btn btn-primary" onclick="checkSRLines()">✅ Sprawdź</button>
+  <button class="btn" onclick="newSRChart()">🔄 Nowy wykres</button>
+  <span id="srScore" style="margin-left:0.5rem; font-size:0.85rem; color:var(--text-dim);"></span>
+</div>
+<div id="srFeedback" style="margin-top:0.5rem;"></div>
   </div>
   <div class="card"><h2>📐 Linie trendu</h2><p>Rysuj po minimum dwóch punktach styczności. Trzeci punkt to potencjalna reakcja. Nie naginaj linii na siłę.</p></div>
   <div class="card"><h2>🎮 Ćwiczenie decyzyjne</h2><p>Trend 15M wzrostowy, cena dotyka wsparcia 62 000. Pojawia się bycza świeca. Co robisz?</p>
@@ -358,43 +370,231 @@ function calcPosition(){
     </div>`;
 }
 
-// ============ CANVAS S/R ============
-let srLines = [];
-function drawSRCanvas(){
-  const c = document.getElementById('canvasSR');
-  if(!c) return;
-  const ctx = c.getContext('2d');
-  ctx.clearRect(0,0,c.width,c.height);
-  ctx.fillStyle = '#070b12'; ctx.fillRect(0,0,c.width,c.height);
-  // przykładowe świece
-  const candles = [{o:200,h:170,l:210,c:190},{o:190,h:165,l:220,c:215},{o:215,h:180,l:240,c:200},{o:200,h:150,l:230,c:225},{o:225,h:185,l:260,c:195},{o:195,h:160,l:250,c:240},{o:240,h:200,l:270,c:210},{o:210,h:170,l:235,c:220}];
-  candles.forEach((cnd,i)=>{
-    const x=50+i*70, isBull=cnd.c>=cnd.o;
-    ctx.strokeStyle=isBull?'#2dba6a':'#e05555'; ctx.lineWidth=1;
-    ctx.beginPath(); ctx.moveTo(x+10,cnd.h); ctx.lineTo(x+10,Math.min(cnd.o,cnd.c)); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(x+10,Math.max(cnd.o,cnd.c)); ctx.lineTo(x+10,cnd.l); ctx.stroke();
-    ctx.fillStyle=isBull?'#1a4a2a':'#3a1414';
-    ctx.fillRect(x,Math.min(cnd.o,cnd.c),20,Math.abs(cnd.c-cnd.o));
-    ctx.strokeRect(x,Math.min(cnd.o,cnd.c),20,Math.abs(cnd.c-cnd.o));
+// ============ NOWY CANVAS S/R – losowe świece + weryfikacja ============
+let srChartData = [];       // obiekty {o,h,l,c}
+let srLines = [];           // tablica Y-pozycji linii użytkownika
+let srLevels = [];          // wykryte poziomy S/R (y-pozycje na canvasie)
+let srMaxPrice = 0, srMinPrice = 0;
+
+// Generuje losowe świece (random walk)
+function generateRandomCandles(count = 30) {
+  const candles = [];
+  let price = 50000 + Math.random() * 15000;
+  const volatility = 0.004; // 0.4% zmienności
+  for (let i = 0; i < count; i++) {
+    const open = price;
+    const change = (Math.random() - 0.48) * volatility * price;
+    const close = open + change;
+    const high = Math.max(open, close) + Math.random() * volatility * price * 0.6;
+    const low = Math.min(open, close) - Math.random() * volatility * price * 0.6;
+    candles.push({ o: open, h: high, l: low, c: close });
+    price = close;
+  }
+  return candles;
+}
+
+// Znajduje lokalne szczyty i dołki (poziomy S/R)
+function findSRLevels(candles) {
+  const levels = [];
+  for (let i = 2; i < candles.length - 2; i++) {
+    const c = candles[i];
+    // lokalny szczyt
+    if (c.h > candles[i-1].h && c.h > candles[i-2].h && c.h > candles[i+1].h && c.h > candles[i+2].h) {
+      levels.push({ price: c.h, type: 'resistance' });
+    }
+    // lokalny dołek
+    if (c.l < candles[i-1].l && c.l < candles[i-2].l && c.l < candles[i+1].l && c.l < candles[i+2].l) {
+      levels.push({ price: c.l, type: 'support' });
+    }
+  }
+  // Usuń duplikaty (bliskie poziomy)
+  const unique = [];
+  levels.forEach(l => {
+    if (!unique.some(u => Math.abs(u.price - l.price) / l.price < 0.003)) {
+      unique.push(l);
+    }
   });
-  // linie użytkownika
+  return unique.slice(0, 6); // max 6 poziomów
+}
+
+// Konwertuje cenę na Y na canvasie
+function priceToY(price) {
+  const pad = (srMaxPrice - srMinPrice) * 0.15;
+  const h = 320;
+  return 10 + (1 - (price - srMinPrice + pad) / (srMaxPrice - srMinPrice + 2 * pad)) * (h - 20);
+}
+
+// Konwertuje Y na cenę
+function yToPrice(y) {
+  const pad = (srMaxPrice - srMinPrice) * 0.15;
+  const h = 320;
+  const ratio = 1 - (y - 10) / (h - 20);
+  return srMinPrice - pad + ratio * (srMaxPrice - srMinPrice + 2 * pad);
+}
+
+// Rysuje cały wykres
+function drawSRCanvas() {
+  const c = document.getElementById('canvasSR');
+  if (!c || !srChartData.length) return;
+  const ctx = c.getContext('2d');
+  const W = c.width, H = c.height;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#070b12';
+  ctx.fillRect(0, 0, W, H);
+
+  // Oblicz zakres cen
+  const allPrices = srChartData.flatMap(cn => [cn.h, cn.l]);
+  srMinPrice = Math.min(...allPrices);
+  srMaxPrice = Math.max(...allPrices);
+
+  const cw = (W - 80) / srChartData.length;
+
+  // Siatka pozioma
+  ctx.strokeStyle = '#1a2434';
+  ctx.lineWidth = 0.5;
+  for (let i = 0; i <= 6; i++) {
+    const y = 10 + (H - 20) / 6 * i;
+    ctx.beginPath();
+    ctx.moveTo(40, y);
+    ctx.lineTo(W - 20, y);
+    ctx.stroke();
+
+    const price = yToPrice(y);
+    ctx.fillStyle = '#4a5e72';
+    ctx.font = '9px monospace';
+    ctx.fillText(price.toFixed(1), W - 75, y + 3);
+  }
+
+  // Świece
+  srChartData.forEach((cn, i) => {
+    const x = 50 + i * cw + cw * 0.15;
+    const bodyW = Math.max(cw * 0.6, 3);
+    const yO = priceToY(cn.o), yC = priceToY(cn.c), yH = priceToY(cn.h), yL = priceToY(cn.l);
+    const isBull = cn.c >= cn.o;
+
+    // Cień
+    ctx.strokeStyle = isBull ? '#2dba6a' : '#e05555';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x + bodyW / 2, yH);
+    ctx.lineTo(x + bodyW / 2, Math.min(yO, yC));
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x + bodyW / 2, Math.max(yO, yC));
+    ctx.lineTo(x + bodyW / 2, yL);
+    ctx.stroke();
+
+    // Korpus
+    const bodyH = Math.max(Math.abs(yC - yO), 1);
+    ctx.fillStyle = isBull ? '#1a4a2a' : '#3a1414';
+    ctx.strokeStyle = isBull ? '#2dba6a' : '#e05555';
+    ctx.fillRect(x, Math.min(yO, yC), bodyW, bodyH);
+    ctx.strokeRect(x, Math.min(yO, yC), bodyW, bodyH);
+  });
+
+  // Linie użytkownika
   srLines.forEach(y => {
-    ctx.strokeStyle='rgba(226,176,61,0.6)'; ctx.lineWidth=1.5; ctx.setLineDash([4,4]);
-    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(c.width,y); ctx.stroke(); ctx.setLineDash([]);
+    ctx.strokeStyle = 'rgba(226,176,61,0.7)';
+    ctx.lineWidth = 1.8;
+    ctx.setLineDash([6, 3]);
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(W, y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Etykieta ceny
+    const price = yToPrice(y);
+    ctx.fillStyle = '#e2b03d';
+    ctx.font = 'bold 10px monospace';
+    ctx.fillText(price.toFixed(1), 2, y - 4);
   });
 }
-let drawing=false;
-document.addEventListener('DOMContentLoaded', ()=>{
-  const c=document.getElementById('canvasSR');
-  if(!c) return;
-  c.addEventListener('mousedown',(e)=>{ drawing=true; srLines.push(e.offsetY); drawSRCanvas(); });
-  c.addEventListener('mouseup',()=>{ drawing=false; });
-  c.addEventListener('mousemove',(e)=>{ if(drawing){ srLines[srLines.length-1]=e.offsetY; drawSRCanvas(); } });
-  drawSRCanvas();
-});
 
-function clearCanvas(){ srLines=[]; drawSRCanvas(); }
-function suggestSR(){ srLines=[80,170,240]; drawSRCanvas(); }
+// Generuj nowy wykres
+function newSRChart() {
+  srChartData = generateRandomCandles(30);
+  srLines = [];
+  srLevels = findSRLevels(srChartData);
+  drawSRCanvas();
+  document.getElementById('srScore').textContent = '';
+  document.getElementById('srFeedback').innerHTML = '';
+}
+
+// Wyczyść linie użytkownika
+function clearCanvas() {
+  srLines = [];
+  drawSRCanvas();
+  document.getElementById('srScore').textContent = '';
+  document.getElementById('srFeedback').innerHTML = '';
+}
+
+// Pokaż wykryte poziomy S/R
+function suggestSR() {
+  srLines = srLevels.map(l => priceToY(l.price));
+  drawSRCanvas();
+}
+
+// Sprawdź trafność linii
+function checkSRLines() {
+  if (srLines.length === 0) {
+    document.getElementById('srFeedback').innerHTML = '<span class="info">📌 Narysuj najpierw przynajmniej jedną linię.</span>';
+    return;
+  }
+  if (srLevels.length === 0) {
+    document.getElementById('srFeedback').innerHTML = '<span class="info">📌 Kliknij "Nowy wykres", aby wygenerować dane.</span>';
+    return;
+  }
+
+  let hits = 0;
+  const tolerance = (srMaxPrice - srMinPrice) * 0.005; // 0.5% zakresu
+
+  srLines.forEach(lineY => {
+    const linePrice = yToPrice(lineY);
+    srLevels.forEach(level => {
+      if (Math.abs(linePrice - level.price) < tolerance) hits++;
+    });
+  });
+
+  const maxHits = Math.min(srLines.length, srLevels.length);
+  const score = maxHits > 0 ? Math.round((hits / maxHits) * 100) : 0;
+
+  document.getElementById('srScore').textContent = `Trafność: ${score}%`;
+
+  if (score >= 70) {
+    document.getElementById('srFeedback').innerHTML = '<span class="hit">✅ Świetnie! Twoje linie trafiają w pobliże prawidłowych poziomów S/R.</span>';
+  } else if (score >= 30) {
+    document.getElementById('srFeedback').innerHTML = '<span class="miss">⚠️ Część linii jest blisko. Spróbuj dostosować je do lokalnych szczytów lub dołków.</span>';
+  } else {
+    document.getElementById('srFeedback').innerHTML = '<span class="miss">❌ Twoje linie są daleko od poziomów. Szukaj miejsc, gdzie cena wyraźnie zawracała (szczyty/dołki).</span>';
+  }
+}
+
+// Obsługa myszy
+let srDrawing = false;
+document.addEventListener('DOMContentLoaded', () => {
+  const c = document.getElementById('canvasSR');
+  if (!c) return;
+
+  c.addEventListener('mousedown', (e) => {
+    srDrawing = true;
+    srLines.push(e.offsetY);
+    drawSRCanvas();
+  });
+
+  c.addEventListener('mousemove', (e) => {
+    if (srDrawing && srLines.length > 0) {
+      srLines[srLines.length - 1] = e.offsetY;
+      drawSRCanvas();
+    }
+  });
+
+  c.addEventListener('mouseup', () => { srDrawing = false; });
+  c.addEventListener('mouseleave', () => { srDrawing = false; });
+
+  // Inicjalne dane
+  newSRChart();
+});
 
 // ============ FEEDBACKI ĆWICZEŃ ============
 function feedbackM1(opt){
