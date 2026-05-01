@@ -171,8 +171,21 @@
       <p style="color:var(--text-dim); font-size:0.8rem; margin-top:0.3rem;">🕯️ Od lewej: młotek, shooting star, objęcie bycze, objęcie niedźwiedzie, doji.</p>
     </div>
   </div>
-  <div class="card"><h2>🎮 Ćwiczenie</h2><p>Na oporze 65 000 pojawia się świeca z długim górnym cieniem. Co to za formacja?</p>
-    <button class="quiz-opt" onclick="feedbackM2(0)">🔨 Młotek</button><button class="quiz-opt" onclick="feedbackM2(1)">⭐ Shooting Star</button><button class="quiz-opt" onclick="feedbackM2(2)">🔄 Objęcie</button><div id="fbM2"></div>
+    <div class="card">
+    <h2>🎮 Trening formacji – rozpoznaj i zdecyduj</h2>
+    <p>Na podstawie opisu świecy i sytuacji rynkowej wybierz właściwą formację i zdecyduj, co robisz.</p>
+    
+    <div class="info-box">📌 <strong>Zasada:</strong> Formacja musi współgrać z trendem i poziomem S/R. Sama świeca to za mało!</div>
+    
+    <p id="candleGameQ">Kliknij <strong>Nowy scenariusz</strong>, aby rozpocząć.</p>
+    
+    <div id="candleGameOpts"></div>
+    <div id="candleGameFb"></div>
+    
+    <div style="margin-top:1rem; display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
+      <button class="btn btn-primary" onclick="newCandleGame()">🔄 Nowy scenariusz</button>
+      <span id="candleGameScore" style="font-size:0.85rem; color:var(--text-dim);"></span>
+    </div>
   </div>
   <div class="card"><h2>✅ Checklista M2</h2><div class="checklist" id="chk2"></div></div>
 </section>
@@ -760,6 +773,99 @@ function answerSRGame(scIdx, chosen){
     if(i === chosen && i !== sc.correct) b.style.borderColor = 'var(--red)';
   });
 }
+// ============ GRA FORMACJE ŚWIECOWE ============
+let candleGameCorrect = 0;
+let candleGameTotal = 0;
+
+const candleScenarios = [
+  {
+    q: "Trend 15M wzrostowy. Cena dotyka wsparcia. Pojawia się świeca z DŁUGIM DOLNYM CIENIEM i małym zielonym korpusem u góry. Co widzisz?",
+    opts: ["🔨 Młotek – wchodzę LONG po potwierdzeniu", "⭐ Shooting Star – wchodzę SHORT", "🔄 Objęcie – czekam na następną świecę"],
+    correct: 0,
+    feedback: [
+      "✅ Tak! Młotek na wsparciu = byczy sygnał. Ale zawsze czekaj na potwierdzenie następną świecą.",
+      "❌ Shooting Star ma długi GÓRNY cień, nie dolny. To nie ta formacja.",
+      "❌ Objęcie to pochłonięcie poprzedniej świecy – tu masz pojedynczą świecę z cieniem."
+    ]
+  },
+  {
+    q: "Trend 15M spadkowy. Na oporze pojawia się świeca z DŁUGIM GÓRNYM CIENIEM i małym czerwonym korpusem u dołu. Co to?",
+    opts: ["🔨 Młotek – sygnał byczy", "⭐ Shooting Star – wchodzę SHORT po potwierdzeniu", "➖ Doji – rynek się waha, nie wchodzę"],
+    correct: 1,
+    feedback: [
+      "❌ Młotek ma długi DOLNY cień. Ta świeca ma długi górny – to Shooting Star.",
+      "✅ Dokładnie! Shooting Star na oporze = niedźwiedzi sygnał. Czekaj na potwierdzenie.",
+      "❌ Doji ma równe Open i Close – tu jest wyraźny korpus i długi cień."
+    ]
+  },
+  {
+    q: "Na wsparciu pojawia się DUŻA ZIELONA ŚWIECA, która całkowicie pochłania poprzednią czerwoną. High wyższy, Low niższy. Co to?",
+    opts: ["🔨 Młotek", "🔄 Bycze objęcie – wchodzę LONG", "⭐ Shooting Star"],
+    correct: 1,
+    feedback: [
+      "❌ Młotek to pojedyncza świeca z cieniem, nie dwie świece.",
+      "✅ Świetnie! Bycze objęcie na wsparciu to silny sygnał zmiany kierunku.",
+      "❌ Shooting Star ma długi górny cień – tu masz dwie świece, jedna pochłania drugą."
+    ]
+  },
+  {
+    q: "Trend 15M wzrostowy. Na wsparciu pojawia się świeca z DŁUGIM DOLNYM CIENIEM. Następna świeca jest ZIELONA i zamyka się powyżej poprzedniej. Co robisz?",
+    opts: ["Wchodzę LONG – młotek potwierdzony", "Czekam jeszcze – to za mało", "Wchodzę SHORT – cena odbije się"],
+    correct: 0,
+    feedback: [
+      "✅ Młotek + potwierdzenie zieloną świecą = setup wejścia. SL pod dołkiem młotka.",
+      "❌ Masz już formację i potwierdzenie. Możesz wchodzić z małą pozycją.",
+      "❌ Shortowanie w trendzie wzrostowym przy wsparciu to walka z rynkiem."
+    ]
+  },
+  {
+    q: "Na oporze pojawia się świeca z DŁUGIM GÓRNYM I DŁUGIM DOLNYM CIENIEM, Open i Close są prawie równe. Co to?",
+    opts: ["🔨 Młotek", "⭐ Shooting Star", "➖ Doji – niezdecydowanie, lepiej poczekać"],
+    correct: 2,
+    feedback: [
+      "❌ Młotek ma długi dolny cień i mały korpus – tu cienie są po obu stronach.",
+      "❌ Shooting Star ma długi górny cień – tu są oba cienie długie.",
+      "✅ Doji = rynek się waha. Na oporze to ostrzeżenie – lepiej poczekać na wyraźniejszy sygnał."
+    ]
+  },
+  {
+    q: "Trend spadkowy. Na oporze pojawia się DUŻA CZERWONA ŚWIECA pochłaniająca poprzednią zieloną. Co robisz?",
+    opts: ["Wchodzę SHORT – niedźwiedzie objęcie na oporze", "Wchodzę LONG – cena się odbije", "Ignoruję – to słaby sygnał"],
+    correct: 0,
+    feedback: [
+      "✅ Niedźwiedzie objęcie na oporze w trendzie spadkowym = silny setup short.",
+      "❌ Long w trendzie spadkowym przy oporze? Nigdy nie walcz z trendem.",
+      "❌ Objęcie na poziomie to jeden z silniejszych sygnałów – nie ignoruj go."
+    ]
+  }
+];
+
+function newCandleGame(){
+  const idx = Math.floor(Math.random() * candleScenarios.length);
+  const sc = candleScenarios[idx];
+  document.getElementById('candleGameQ').innerHTML = `<strong>Sytuacja:</strong> ${sc.q}`;
+  document.getElementById('candleGameOpts').innerHTML = sc.opts.map((o,i) => 
+    `<button class="quiz-opt" onclick="answerCandleGame(${idx},${i})">${o}</button>`
+  ).join('');
+  document.getElementById('candleGameFb').innerHTML = '';
+}
+
+function answerCandleGame(scIdx, chosen){
+  const sc = candleScenarios[scIdx];
+  candleGameTotal++;
+  if(chosen === sc.correct) candleGameCorrect++;
+  
+  document.getElementById('candleGameScore').textContent = `Trafienia: ${candleGameCorrect}/${candleGameTotal}`;
+  document.getElementById('candleGameFb').innerHTML = 
+    `<div class="feedback ${chosen === sc.correct ? 'good' : 'bad'}">${sc.feedback[chosen]}</div>`;
+  
+  document.querySelectorAll('#candleGameOpts .quiz-opt').forEach((b,i) => {
+    b.disabled = true;
+    if(i === sc.correct) b.style.borderColor = 'var(--green)';
+    if(i === chosen && i !== sc.correct) b.style.borderColor = 'var(--red)';
+  });
+}
+  
 // ============ INIT ============
 document.addEventListener('DOMContentLoaded',()=>{
   renderChecklists();
